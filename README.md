@@ -1,170 +1,120 @@
-# 🏗️ Terraform AWS Highly Available Multi-AZ VPC
+# Terraform AWS Multi-AZ VPC Foundation
 
-This project sets up a **highly available Virtual Private Cloud (VPC)** on AWS
-using Terraform. It includes:
+[![Terraform](https://img.shields.io/badge/Terraform-1.7%2B-623CE4?logo=terraform&logoColor=white)](https://developer.hashicorp.com/terraform)
+[![AWS Provider](https://img.shields.io/badge/AWS_Provider-5.x-FF9900?logo=amazonaws&logoColor=white)](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 
-- A custom VPC with DNS hostnames enabled
-- Public and private subnets distributed across multiple Availability Zones
-- Internet Gateway for public internet access
-- NAT Gateway with Elastic IP for private subnet internet access
-- Route Tables with proper associations for public and private subnets
-- Security Groups:
-  - **Public SG**: Allows HTTP (80) and HTTPS (443) inbound traffic
-  - **Private SG**: Allows PostgreSQL (5432) traffic from within the VPC
+A Terraform module for creating a practical AWS network foundation with public
+and private subnets across multiple Availability Zones. It is designed as a
+starting point for workloads such as ECS services, RDS databases, or
+load-balanced applications.
 
----
+Part of [Abel Nutsugah’s AWS infrastructure portfolio](https://github.com/bigmanabel).
 
-<!-- ## 📐 Architecture Diagram -->
-<!--  -->
-<!-- **Title**: *Highly Available Multi-AZ VPC Architecture on AWS (Terraform)* -->
-<!--  -->
-<!-- [🔗 View Interactive Diagram in Eraser.io](https://eraser.io/board/your-diagram-link) -->
-<!--  -->
-<!-- ![HA VPC Architecture](./diagrams/ha-vpc-diagram.png) -->
-<!--  -->
-<!-- > The diagram shows a VPC with 2 public and 2 private subnets across 2 AZs, Internet Gateway, NAT Gateway, and security groups. -->
-<!--  -->
-<!-- --- -->
+## Use case
 
-## 📁 Project Structure
+Use this repository when an application needs a clear network boundary:
+internet-facing components in public subnets and application or data workloads
+in private subnets. The module makes the subnet, routing, and security-group
+relationships explicit and reusable.
 
-```bash
-terraform-aws-high-availability-vpc/
-├── main.tf
-├── variables.tf
-├── outputs.tf
-├── terraform.tfvars
-├── terraform.tfvars.example
-├── provider.tf
-├── LICENSE
-├── README.md
-└── modules/
-    └── vpc/
-        ├── main.tf
-        ├── variables.tf
-        └── outputs.tf
+## Architecture
+
+```mermaid
+flowchart TB
+    Internet((Internet)) --> IGW[Internet Gateway]
+    IGW --> PubA[Public subnet · AZ A]
+    IGW --> PubB[Public subnet · AZ B]
+    PubA --> NAT[Single NAT Gateway]
+    NAT --> PrivA[Private subnet · AZ A]
+    NAT --> PrivB[Private subnet · AZ B]
+    PubA --> PublicSG[Public security group: HTTP/HTTPS]
+    PrivA --> PrivateSG[Private security group: PostgreSQL from VPC]
+    PrivB --> PrivateSG
 ```
 
----
+## What Terraform creates
 
-## � Requirements
+- VPC with DNS hostnames enabled
+- One public and one private subnet per configured Availability Zone
+- Internet Gateway and public route table
+- One Elastic IP and a NAT Gateway for private-subnet outbound access
+- Private route table associated with every private subnet
+- Public security group allowing HTTP/HTTPS ingress
+- Private security group allowing PostgreSQL ingress from the VPC CIDR
 
-- **Terraform**: Version ~> 1.7
-- **AWS Provider**: Version ~> 5.0
-- **AWS CLI**: For authentication and configuration
+## Prerequisites
 
----
+- Terraform `~> 1.7`
+- AWS provider `~> 5.0`
+- AWS CLI authentication through a profile, AWS IAM Identity Center, or
+  environment credentials
 
-## �🛠 Setup Instructions
+## Configure and validate
 
-Before deploying, follow these steps to set up your environment:
-
-1. **Install Terraform**
-
-   Download and install from:  
-   https://developer.hashicorp.com/terraform/downloads
-
-2. **Install AWS CLI**
-
-   Install from:  
-   https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html
-
-3. **Configure AWS Credentials**
-
-   **Option A: AWS CLI Configuration**
-
-   ```bash
-   aws configure
-   ```
-
-   **Option B: Environment Variables**
-
-   Create a `.env` file in your project root:
-
-   ```bash
-   # .env
-   export AWS_ACCESS_KEY_ID="your-access-key-id"
-   export AWS_SECRET_ACCESS_KEY="your-secret-access-key"
-   export AWS_DEFAULT_REGION="us-east-1"
-   ```
-
-   Then source the file:
-
-   ```bash
-   source .env
-   ```
-
-4. **Clone This Repository**
-
-   ```bash
-   git clone https://github.com/bigmanabel/terraform-aws-high-availability-vpc.git
-   cd terraform-aws-high-availability-vpc
-   ```
-
-5. **Review and Customize Variables**
-
-   Open `terraform.tfvars` and update values such as:
-
-   ```hcl
-   aws_region   = "us-east-1"
-   project_name = "tf-aws-vpc"
-   vpc_cidr     = "10.0.0.0/16"
-   azs          = ["us-east-1a", "us-east-1b"]
-   ```
-
-6. _(Optional)_ Set up Remote State with S3 & DynamoDB  
-   (for production-grade infrastructure and collaboration)
-
----
-
-## 🚀 Deployment
+Copy the safe example file, choose a CIDR range that does not overlap with
+existing networks, and select available zones for the target region:
 
 ```bash
-# Initialize Terraform
+cp terraform.tfvars.example terraform.tfvars
+terraform fmt -check -recursive
 terraform init
-
-# Preview the infrastructure changes
+terraform validate
 terraform plan
+```
 
-# Apply the configuration
+```hcl
+aws_region   = "us-east-1"
+project_name = "example-vpc"
+vpc_cidr     = "10.0.0.0/16"
+azs          = ["us-east-1a", "us-east-1b"]
+```
+
+Apply only after reviewing the plan:
+
+```bash
 terraform apply
 ```
 
----
+The root module outputs the VPC ID and public/private subnet IDs for use by
+application modules.
 
-## ⚙️ Inputs
+## Availability, security, and cost notes
 
-| Variable       | Description                    | Type           | Default     | Example                        |
-| -------------- | ------------------------------ | -------------- | ----------- | ------------------------------ |
-| `aws_region`   | AWS region to deploy resources | `string`       | `us-east-1` | `"us-east-1"`                  |
-| `project_name` | Name prefix for all resources  | `string`       | -           | `"tf-aws-vpc"`                 |
-| `vpc_cidr`     | CIDR block for the VPC         | `string`       | -           | `"10.0.0.0/16"`                |
-| `azs`          | List of AZs to deploy into     | `list(string)` | -           | `["us-east-1a", "us-east-1b"]` |
+- The subnets span the supplied Availability Zones, but the current design uses
+  **one NAT Gateway in the first public subnet**. This is a cost-conscious
+  baseline, not full zone-level egress redundancy.
+- For workloads that require resilient private-subnet egress, use one NAT
+  Gateway and private route table per Availability Zone. That change increases
+  cost and should be reviewed with the workload’s availability requirements.
+- The public security group permits inbound ports 80 and 443 from the internet.
+  Attach it only to an intended public endpoint such as an Application Load
+  Balancer.
+- The private database group currently allows PostgreSQL from the full VPC CIDR.
+  A client deployment should typically restrict that rule to the application
+  security group instead.
+- NAT Gateway, Elastic IP, and data processing can incur AWS charges. Review
+  the plan and current AWS pricing before deploying.
 
----
+## Project layout
 
-## 📤 Outputs
+```text
+├── main.tf                    # Root module invocation
+├── provider.tf                # Terraform and AWS provider requirements
+├── terraform.tfvars.example   # Safe configuration template
+└── modules/vpc/
+    ├── main.tf                # Network, routing, NAT, and security groups
+    ├── variables.tf           # Module inputs
+    └── outputs.tf             # VPC and subnet identifiers
+```
 
-| Output               | Description                |
-| -------------------- | -------------------------- |
-| `vpc_id`             | ID of the created VPC      |
-| `public_subnet_ids`  | List of public subnet IDs  |
-| `private_subnet_ids` | List of private subnet IDs |
-| `public_sg_id`       | Public Security Group ID   |
-| `private_sg_id`      | Private Security Group ID  |
+## Production follow-ups
 
----
+Before using this foundation for a long-lived client environment, consider a
+remote encrypted Terraform backend, consistent resource tags, VPC Flow Logs,
+per-AZ NAT routing, least-privilege security-group rules, and a review of IPv6
+or service-endpoint requirements.
 
-## 📌 Notes
+## Cleanup
 
-- This project is designed to be modular and extensible.
-- It forms the foundation for adding ALBs, EC2s, RDS, ECS, etc.
-- Best suited for scalable, secure, and highly available workloads.
-
----
-
-## 🧠 Inspiration
-
-This architecture follows AWS best practices for high availability and security,
-and is built to showcase real-world infrastructure-as-code skills for DevOps and
-cloud engineers.
+Run `terraform destroy` only after confirming the target account and workspace.
+This removes the VPC and all resources created by this configuration.
