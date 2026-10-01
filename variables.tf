@@ -18,3 +18,9 @@ variable "azs" {
   description = "List of Availability Zones"
   type        = list(string)
 }
+
+variable "nat_gateway_per_az" {
+  description = "Create one NAT Gateway and private route table per Availability Zone. This improves egress resilience but increases cost."
+  type        = bool
+  default     = false
+}

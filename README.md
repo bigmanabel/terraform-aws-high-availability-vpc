@@ -67,6 +67,7 @@ aws_region   = "us-east-1"
 project_name = "example-vpc"
 vpc_cidr     = "10.0.0.0/16"
 azs          = ["us-east-1a", "us-east-1b"]
+nat_gateway_per_az = false
 ```
 
 Apply only after reviewing the plan:
@@ -81,11 +82,12 @@ application modules.
 ## Availability, security, and cost notes
 
 - The subnets span the supplied Availability Zones, but the current design uses
-  **one NAT Gateway in the first public subnet**. This is a cost-conscious
-  baseline, not full zone-level egress redundancy.
+  **one NAT Gateway in the first public subnet** by default. This is a
+  cost-conscious baseline, not full zone-level egress redundancy.
 - For workloads that require resilient private-subnet egress, use one NAT
-  Gateway and private route table per Availability Zone. That change increases
-  cost and should be reviewed with the workload’s availability requirements.
+  Gateway and private route table per Availability Zone by setting
+  `nat_gateway_per_az = true`. That change increases cost and should be
+  reviewed with the workload’s availability requirements.
 - The public security group permits inbound ports 80 and 443 from the internet.
   Attach it only to an intended public endpoint such as an Application Load
   Balancer.

@@ -35,15 +35,32 @@ resource "aws_subnet" "private" {
   }
 }
 
-resource "aws_eip" "nat" {
+locals {
+  nat_gateway_count = var.nat_gateway_per_az ? length(var.azs) : 1
+}
 
+moved {
+  from = aws_eip.nat
+  to   = aws_eip.nat[0]
+}
+
+resource "aws_eip" "nat" {
+  count  = local.nat_gateway_count
+  domain = "vpc"
+}
+
+moved {
+  from = aws_nat_gateway.nat
+  to   = aws_nat_gateway.nat[0]
 }
 
 resource "aws_nat_gateway" "nat" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
+  count         = local.nat_gateway_count
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[var.nat_gateway_per_az ? count.index : 0].id
+
   tags = {
-    Name = "${var.project_name}-nat-gw"
+    Name = "${var.project_name}-nat-gw-${count.index + 1}"
   }
 }
 
@@ -64,21 +81,29 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+moved {
+  from = aws_route_table.private
+  to   = aws_route_table.private[0]
+}
+
 resource "aws_route_table" "private" {
+  count  = local.nat_gateway_count
   vpc_id = aws_vpc.main.id
+
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat.id
+    nat_gateway_id = aws_nat_gateway.nat[count.index].id
   }
+
   tags = {
-    Name = "${var.project_name}-private-rt"
+    Name = "${var.project_name}-private-rt-${count.index + 1}"
   }
 }
 
 resource "aws_route_table_association" "private" {
   count          = length(var.azs)
   subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = aws_route_table.private.id
+  route_table_id = aws_route_table.private[var.nat_gateway_per_az ? count.index : 0].id
 }
 
 resource "aws_security_group" "public_sg" {
