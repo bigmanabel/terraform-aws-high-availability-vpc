@@ -13,11 +13,3 @@ output "private_subnet_ids" {
 output "nat_gateway_ids" {
   value = aws_nat_gateway.nat[*].id
 }
-
-output "public_sg_id" {
-  value = aws_security_group.public_sg.id
-}
-
-output "private_sg_id" {
-  value = aws_security_group.private_sg.id
-}

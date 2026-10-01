@@ -4,4 +4,4 @@ vpc_cidr     = "10.0.0.0/16"
 azs          = ["us-east-1a", "us-east-1b"]
 
 # Set to true for independent private-subnet egress in each Availability Zone.
-nat_gateway_per_az = false
+nat_gateway_per_az = true

@@ -82,18 +82,13 @@ application modules.
 ## Availability, security, and cost notes
 
 - The subnets span the supplied Availability Zones, but the current design uses
-  **one NAT Gateway in the first public subnet** by default. This is a
-  cost-conscious baseline, not full zone-level egress redundancy.
-- For workloads that require resilient private-subnet egress, use one NAT
-  Gateway and private route table per Availability Zone by setting
-  `nat_gateway_per_az = true`. That change increases cost and should be
-  reviewed with the workload’s availability requirements.
-- The public security group permits inbound ports 80 and 443 from the internet.
-  Attach it only to an intended public endpoint such as an Application Load
-  Balancer.
-- The private database group currently allows PostgreSQL from the full VPC CIDR.
-  A client deployment should typically restrict that rule to the application
-  security group instead.
+  **one NAT Gateway and private route table per Availability Zone** by default.
+  This avoids a single-AZ private-egress dependency.
+- Set `nat_gateway_per_az = false` only for short-lived, cost-sensitive demos.
+  That option routes all private subnets through a single NAT Gateway.
+- This foundation deliberately creates no workload security groups. Define
+  security groups next to the load balancer, compute, or database they protect
+  so each ingress rule has a clear owner and least-privilege purpose.
 - NAT Gateway, Elastic IP, and data processing can incur AWS charges. Review
   the plan and current AWS pricing before deploying.
 
